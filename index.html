@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Student Study Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div class="container mx-auto p-4">
+        <h1 class="text-4xl font-bold text-center mb-8">Collaborative Student Study Hub</h1>
+        <div id="dashboard" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- User ID Display -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">My User ID</h2>
+                <p id="user-id" class="text-lg">Loading...</p>
+            </div>
+
+            <!-- Clock & Date Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">Current Time & Date</h2>
+                <p id="clock" class="text-3xl font-mono"></p>
+                <p id="date" class="text-lg"></p>
+            </div>
+
+            <!-- Weather Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">Weather</h2>
+                <div class="flex items-center">
+                    <svg class="w-12 h-12 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <div>
+                        <p class="text-lg">Sunny</p>
+                        <p class="text-gray-500">New Delhi</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">Calendar</h2>
+                <div id="calendar" class="grid grid-cols-7 gap-1 text-center"></div>
+            </div>
+
+            <!-- Friends' Status Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md md:col-span-2">
+                <h2 class="text-xl font-bold mb-2">Friends' Status</h2>
+                <div class="flex mb-4">
+                    <input type="text" id="status-input" class="flex-grow border rounded-l-lg p-2" placeholder="What are you working on?">
+                    <button id="update-status-btn" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg">Update</button>
+                </div>
+                <div id="statuses-list" class="space-y-2"></div>
+            </div>
+
+            <!-- My Study Progress Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">My Study Progress</h2>
+                <textarea id="progress-textarea" class="w-full h-40 border rounded-lg p-2" placeholder="Autosaves as you type..."></textarea>
+            </div>
+
+            <!-- Upcoming Plans Card -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2">Upcoming Plans</h2>
+                <div class="flex mb-4">
+                    <input type="text" id="plan-input" class="flex-grow border rounded-l-lg p-2" placeholder="Add a new plan...">
+                    <button id="add-plan-btn" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg">Add</button>
+                </div>
+                <ul id="plans-list" class="space-y-2"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        // IMPORTANT: Replace with your own Firebase project configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Static Widgets
+        const clockElement = document.getElementById('clock');
+        const dateElement = document.getElementById('date');
+        const calendarElement = document.getElementById('calendar');
+
+        // Clock and Date
+        function updateClock() {
+            const now = new Date();
+            clockElement.textContent = now.toLocaleTimeString();
+            dateElement.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Calendar
+        function renderCalendar() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const today = now.getDate();
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            calendarElement.innerHTML = ''; // Clear previous calendar
+
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            daysOfWeek.forEach(day => {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'font-bold';
+                dayElement.textContent = day;
+                calendarElement.appendChild(dayElement);
+            });
+
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                const emptyCell = document.createElement('div');
+                calendarElement.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.textContent = day;
+                if (day === today) {
+                    dayCell.className = 'bg-blue-500 text-white rounded-full';
+                }
+                calendarElement.appendChild(dayCell);
+            }
+        }
+        renderCalendar();
+
+        // Firebase Authentication
+        const userIdElement = document.getElementById('user-id');
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // User is signed in.
+                const uid = user.uid;
+                userIdElement.textContent = uid;
+                initializeFeatures(user);
+            } else {
+                // User is signed out.
+                auth.signInAnonymously().catch(error => {
+                    console.error("Error signing in anonymously:", error);
+                    userIdElement.textContent = "Error";
+                });
+            }
+        });
+
+        function initializeFeatures(user) {
+            const appId = firebaseConfig.appId || 'default-app-id';
+
+            // Friends' Status
+            const statusInput = document.getElementById('status-input');
+            const updateStatusBtn = document.getElementById('update-status-btn');
+            const statusesList = document.getElementById('statuses-list');
+            const statusesRef = db.collection(`/artifacts/${appId}/public/data/statuses`);
+
+            updateStatusBtn.addEventListener('click', () => {
+                if (statusInput.value.trim() !== '') {
+                    statusesRef.doc(user.uid).set({
+                        status: statusInput.value.trim(),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        statusInput.value = '';
+                    }).catch(error => {
+                        console.error("Error updating status: ", error);
+                    });
+                }
+            });
+
+            statusesRef.orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+                statusesList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const statusData = doc.data();
+                    const statusElement = document.createElement('div');
+                    statusElement.className = 'p-2 border-b';
+
+                    const date = statusData.timestamp ? statusData.timestamp.toDate().toLocaleString() : 'just now';
+
+                    statusElement.innerHTML = `
+                        <p class="font-mono text-sm text-gray-600">${doc.id}</p>
+                        <p class="text-lg">${statusData.status}</p>
+                        <p class="text-xs text-gray-400 text-right">${date}</p>
+                    `;
+                    statusesList.appendChild(statusElement);
+                });
+            }, error => {
+                console.error("Error fetching statuses: ", error);
+            });
+
+            // My Study Progress
+            const progressTextarea = document.getElementById('progress-textarea');
+            const progressRef = db.doc(`/artifacts/${appId}/users/${user.uid}/progress/main`);
+
+            let progressTimeout;
+            progressTextarea.addEventListener('input', () => {
+                clearTimeout(progressTimeout);
+                progressTimeout = setTimeout(() => {
+                    progressRef.set({
+                        content: progressTextarea.value,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    }).catch(error => {
+                        console.error("Error saving progress: ", error);
+                    });
+                }, 500); // Autosave after 500ms of inactivity
+            });
+
+            progressRef.onSnapshot(doc => {
+                if (doc.exists) {
+                    progressTextarea.value = doc.data().content;
+                }
+            }, error => {
+                console.error("Error fetching progress: ", error);
+            });
+
+            // Upcoming Plans
+            const planInput = document.getElementById('plan-input');
+            const addPlanBtn = document.getElementById('add-plan-btn');
+            const plansList = document.getElementById('plans-list');
+            const plansRef = db.collection(`/artifacts/${appId}/users/${user.uid}/plans`);
+
+            addPlanBtn.addEventListener('click', () => {
+                if (planInput.value.trim() !== '') {
+                    plansRef.add({
+                        text: planInput.value.trim(),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        planInput.value = '';
+                    }).catch(error => {
+                        console.error("Error adding plan: ", error);
+                    });
+                }
+            });
+
+            plansRef.orderBy('timestamp', 'asc').onSnapshot(snapshot => {
+                plansList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const plan = doc.data();
+                    const planElement = document.createElement('li');
+                    planElement.className = 'flex justify-between items-center p-2 border-b';
+                    planElement.innerHTML = `
+                        <span>${plan.text}</span>
+                        <button data-id="${doc.id}" class="delete-plan-btn text-red-500 hover:text-red-700">Delete</button>
+                    `;
+                    plansList.appendChild(planElement);
+                });
+
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-plan-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const planId = e.target.getAttribute('data-id');
+                        plansRef.doc(planId).delete().catch(error => {
+                            console.error("Error deleting plan: ", error);
+                        });
+                    });
+                });
+            }, error => {
+                console.error("Error fetching plans: ", error);
+            });
+        }
+    </script>
+</body>
+</html>
